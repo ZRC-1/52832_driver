@@ -1,14 +1,194 @@
-/*
- * Copyright (c) 2012-2014 Wind River Systems, Inc.
- *
- * SPDX-License-Identifier: Apache-2.0
- */
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/sensor.h>
+#include <strings.h>
+/* 定义日志模块 */
+LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
+/* 定义LED引脚 */
+#define LED1	DT_NODELABEL(led0)
+#define LED2	DT_NODELABEL(led1)
+#define LED3	DT_NODELABEL(led2)
+#define LED4	DT_NODELABEL(led3)
+static struct  gpio_dt_spec LED1_struct=GPIO_DT_SPEC_GET(LED1, gpios);
+static struct  gpio_dt_spec LED2_struct=GPIO_DT_SPEC_GET(LED2, gpios);
+static struct  gpio_dt_spec LED3_struct=GPIO_DT_SPEC_GET(LED3, gpios);
+static struct  gpio_dt_spec LED4_struct=GPIO_DT_SPEC_GET(LED4, gpios);
+/* 定义按键引脚 */
+#define botton1	DT_NODELABEL(button0)
+#define botton2	DT_NODELABEL(button1)
+#define botton3	DT_NODELABEL(button2)
+#define botton4	DT_NODELABEL(button3)
+static struct  gpio_dt_spec botton1_struct=GPIO_DT_SPEC_GET(botton1, gpios);
+static struct  gpio_dt_spec botton2_struct=GPIO_DT_SPEC_GET(botton2, gpios);
+static struct  gpio_dt_spec botton3_struct=GPIO_DT_SPEC_GET(botton3, gpios);
+static struct  gpio_dt_spec botton4_struct=GPIO_DT_SPEC_GET(botton4, gpios);
+static struct gpio_callback button_callback_struct;
 
-#include <stdio.h>
-
+/* MPU6050 设备句柄 */
+#define MPU6050_NODE DT_NODELABEL(mpu6050)
+static const struct device *mpu6050_dev = DEVICE_DT_GET(MPU6050_NODE);
+/* 按键回调函数 */
+void gpio_callback(const struct device *port,struct gpio_callback *cb,gpio_port_pins_t pins)
+{
+        if(pins==BIT(botton1_struct.pin))
+        {
+                LOG_DBG("Button pressed");
+                gpio_pin_toggle_dt(&LED1_struct);
+        }
+        if(pins==BIT(botton2_struct.pin))
+        {
+                LOG_DBG("Button pressed");
+                gpio_pin_toggle_dt(&LED2_struct);
+        }
+        if(pins==BIT(botton3_struct.pin))
+        {
+                LOG_DBG("Button pressed");
+                gpio_pin_toggle_dt(&LED3_struct);
+        }
+        if(pins==BIT(botton4_struct.pin))
+        {
+                LOG_DBG("Button pressed");
+                gpio_pin_toggle_dt(&LED4_struct);
+        }
+}
+/* 主函数 */
 int main(void)
 {
-	printf("Hello World! %s\n", CONFIG_BOARD_TARGET);
+	int ret=0;
+	struct sensor_value accel[3];
+	struct sensor_value gyro[3];
+	LOG_INF("Hello World! %s\n", CONFIG_BOARD_TARGET);
 
+	/* 检查 MPU6050 设备是否就绪 */
+	if (!device_is_ready(mpu6050_dev))
+	{
+		LOG_ERR("MPU6050 device is not ready");
+	}
+	if (gpio_is_ready_dt(&LED1_struct)==false)
+	{
+		LOG_ERR("LED1 is not ready");
+	}
+	if (gpio_is_ready_dt(&LED2_struct)==false)
+	{
+		LOG_ERR("LED2 is not ready");
+	}
+	if (gpio_is_ready_dt(&LED3_struct)==false)
+	{
+		LOG_ERR("LED3 is not ready");	
+	}
+	if (gpio_is_ready_dt(&LED4_struct)==false)
+	{
+		LOG_ERR("LED4 is not ready");
+	}
+	if (gpio_is_ready_dt(&botton1_struct)==false)
+	{
+		LOG_ERR("botton1 is not ready");
+	}
+	if (gpio_is_ready_dt(&botton2_struct)==false)
+	{
+		LOG_ERR("botton2 is not ready");
+	}
+	if (gpio_is_ready_dt(&botton3_struct)==false)
+	{
+		LOG_ERR("botton3 is not ready");
+	}
+	if (gpio_is_ready_dt(&botton4_struct)==false)
+	{
+		LOG_ERR("botton4 is not ready");
+	}
+	//配置LED引脚为输出
+	gpio_pin_configure_dt(&LED1_struct, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_configure_dt(&LED2_struct, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_configure_dt(&LED3_struct, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_configure_dt(&LED4_struct, GPIO_OUTPUT_ACTIVE);
+	//配置按键引脚为输入
+	gpio_pin_configure_dt(&botton1_struct, GPIO_INPUT);
+	gpio_pin_configure_dt(&botton2_struct, GPIO_INPUT);
+	gpio_pin_configure_dt(&botton3_struct, GPIO_INPUT);
+	gpio_pin_configure_dt(&botton4_struct, GPIO_INPUT);
+	//初始化按键回调函数
+	ret=gpio_pin_interrupt_configure_dt(&botton1_struct, GPIO_INT_EDGE_TO_ACTIVE);
+	if (ret!=0)
+	{
+		LOG_ERR("Failed to configure botton1");
+	}
+	ret=gpio_pin_interrupt_configure_dt(&botton2_struct, GPIO_INT_EDGE_TO_ACTIVE);
+	if (ret!=0)
+	{
+		LOG_ERR("Failed to configure botton2");
+	}
+	ret=gpio_pin_interrupt_configure_dt(&botton3_struct, GPIO_INT_EDGE_TO_ACTIVE);
+	if (ret!=0)
+	{
+		LOG_ERR("Failed to configure botton3");
+	}
+	ret=gpio_pin_interrupt_configure_dt(&botton4_struct, GPIO_INT_EDGE_TO_ACTIVE);
+	if (ret!=0)
+	{
+		LOG_ERR("Failed to configure botton4");
+	}
+	gpio_init_callback(&button_callback_struct, gpio_callback, BIT(botton1_struct.pin) | BIT(botton2_struct.pin) | BIT(botton3_struct.pin) | BIT(botton4_struct.pin));
+	ret=gpio_add_callback_dt(&botton1_struct, &button_callback_struct);
+	if (ret!=0)
+	{
+		LOG_ERR("Failed to add callback to botton1");
+	}
+	ret=gpio_add_callback_dt(&botton2_struct, &button_callback_struct);
+	if (ret!=0)
+	{
+		LOG_ERR("Failed to add callback to botton2");
+	}
+	ret=gpio_add_callback_dt(&botton3_struct, &button_callback_struct);
+	if (ret!=0)
+	{
+		LOG_ERR("Failed to add callback to botton3");
+	}
+	ret=gpio_add_callback_dt(&botton4_struct, &button_callback_struct);
+	if (ret!=0)
+	{
+		LOG_ERR("Failed to add callback to botton4");
+	}
+
+
+	while (1) 
+	{
+		ret = sensor_sample_fetch(mpu6050_dev);
+		if (ret != 0) 
+		{
+			LOG_ERR("MPU6050 sample fetch failed (%d)", ret);
+			k_sleep(K_MSEC(500));
+			continue;
+		}
+
+		ret = sensor_channel_get(mpu6050_dev, SENSOR_CHAN_ACCEL_XYZ, accel);
+		if (ret != 0)
+		{
+			LOG_ERR("MPU6050 accel channel get failed (%d)", ret);
+			k_sleep(K_MSEC(500));
+			continue;
+		}
+
+		ret = sensor_channel_get(mpu6050_dev, SENSOR_CHAN_GYRO_XYZ, gyro);
+		if (ret != 0)
+		{
+			LOG_ERR("MPU6050 gyro channel get failed (%d)", ret);
+			k_sleep(K_MSEC(500));
+			continue;
+		}
+
+		LOG_INF("Accel x=%d.%06d y=%d.%06d z=%d.%06d",
+			accel[0].val1, accel[0].val2,
+			accel[1].val1, accel[1].val2,
+			accel[2].val1, accel[2].val2);
+		LOG_INF("Gyro  x=%d.%06d y=%d.%06d z=%d.%06d",
+			gyro[0].val1, gyro[0].val2,
+			gyro[1].val1, gyro[1].val2,
+			gyro[2].val1, gyro[2].val2);
+
+		k_sleep(K_MSEC(500));
+	}
 	return 0;
 }
