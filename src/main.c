@@ -4,6 +4,7 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/sensor.h>
+#include <zephyr/device.h>
 #include <strings.h>
 /* 定义日志模块 */
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
@@ -27,9 +28,83 @@ static struct  gpio_dt_spec botton3_struct=GPIO_DT_SPEC_GET(botton3, gpios);
 static struct  gpio_dt_spec botton4_struct=GPIO_DT_SPEC_GET(botton4, gpios);
 static struct gpio_callback button_callback_struct;
 
-/* MPU6050 设备句柄 */
+/* MPU6050 设备句柄与 I2C 配置 */
 #define MPU6050_NODE DT_NODELABEL(mpu6050)
+#define MPU6050_REG_WHO_AM_I 0x75
+#define MPU6050_CHIP_ID      0x68
+#define MPU6050_REG_PWR_MGMT1 0x6B
+
 static const struct device *mpu6050_dev = DEVICE_DT_GET(MPU6050_NODE);
+static const struct i2c_dt_spec mpu6050_i2c = I2C_DT_SPEC_GET(MPU6050_NODE);
+
+/* 扫描 I2C0 总线上所有 7bit 地址 */
+static void i2c0_scan(void)
+{
+	int ret;
+	struct i2c_msg msg;
+	uint8_t addr;
+	uint8_t dummy=0x00;
+	msg.buf = &dummy;
+	msg.len = 1;
+	msg.flags = I2C_MSG_WRITE | I2C_MSG_STOP;
+	if (!device_is_ready(mpu6050_i2c.bus))
+	{
+		LOG_ERR("I2C0 bus device is not ready");
+		return;
+	}
+
+	LOG_INF("Start I2C0 bus scan");
+
+	for (addr = 0x03; addr < 0xff; addr++)
+	{
+		//ret = i2c_read(mpu6050_i2c.bus, &dummy, 1, addr);
+		 ret = i2c_transfer(mpu6050_i2c.bus, &msg, 1, addr);
+		if (ret == 0)
+		{
+			LOG_INF("I2C device found at 0x%02x", addr);
+		}
+	}
+
+	LOG_INF("I2C0 bus scan done");
+}
+
+static int mpu6050_init_chip(void)
+{
+	int ret=0;
+	uint8_t chip_id=0;
+
+	if (!device_is_ready(mpu6050_i2c.bus))
+	{
+		LOG_ERR("MPU6050 I2C bus is not ready");
+		return -EIO;
+	}
+
+	/* 读取芯片 ID */
+	ret = i2c_reg_read_byte_dt(&mpu6050_i2c, MPU6050_REG_WHO_AM_I, &chip_id);
+	if (ret != 0)
+	{
+		LOG_ERR("Failed to read MPU6050 WHO_AM_I (err %d)", ret);
+		return ret;
+	}
+	LOG_INF("MPU6050 WHO_AM_I=0x%02x", chip_id);
+	if (chip_id != MPU6050_CHIP_ID)
+	{
+		LOG_ERR("Unexpected MPU6050 chip ID: 0x%02x (expected 0x%02x)", chip_id, MPU6050_CHIP_ID);
+		return -EIO;
+	}
+
+	LOG_INF("MPU6050 WHO_AM_I=0x%02x", chip_id);
+
+	/* 退出休眠模式，使用内部时钟 */
+	ret = i2c_reg_write_byte_dt(&mpu6050_i2c, MPU6050_REG_PWR_MGMT1, 0x00);
+	if (ret != 0)
+	{
+		LOG_ERR("Failed to write PWR_MGMT1 (err %d)", ret);
+		return ret;
+	}
+
+	return 0;
+}
 /* 按键回调函数 */
 void gpio_callback(const struct device *port,struct gpio_callback *cb,gpio_port_pins_t pins)
 {
@@ -61,11 +136,21 @@ int main(void)
 	struct sensor_value accel[3];
 	struct sensor_value gyro[3];
 	LOG_INF("Hello World! %s\n", CONFIG_BOARD_TARGET);
-
-	/* 检查 MPU6050 设备是否就绪 */
+	
+	device_init(mpu6050_dev);
+	/* 启动前先扫描 I2C0 总线 */
+	//i2c0_scan();
+	ret = mpu6050_init_chip();
+	/* 检查 MPU6050 设备是否就绪并初始化芯片 */
 	if (!device_is_ready(mpu6050_dev))
 	{
 		LOG_ERR("MPU6050 device is not ready");
+	}
+
+	//ret = mpu6050_init_chip();
+	if (ret != 0)
+	{
+		LOG_ERR("MPU6050 init failed (%d)", ret);
 	}
 	if (gpio_is_ready_dt(&LED1_struct)==false)
 	{
@@ -156,28 +241,28 @@ int main(void)
 	while (1) 
 	{
 		ret = sensor_sample_fetch(mpu6050_dev);
-		if (ret != 0) 
-		{
-			LOG_ERR("MPU6050 sample fetch failed (%d)", ret);
-			k_sleep(K_MSEC(500));
-			continue;
-		}
+		// if (ret != 0) 
+		// {
+		// 	LOG_ERR("MPU6050 sample fetch failed (%d)", ret);
+		// 	k_sleep(K_MSEC(500));
+		// 	continue;
+		// }
 
 		ret = sensor_channel_get(mpu6050_dev, SENSOR_CHAN_ACCEL_XYZ, accel);
-		if (ret != 0)
-		{
-			LOG_ERR("MPU6050 accel channel get failed (%d)", ret);
-			k_sleep(K_MSEC(500));
-			continue;
-		}
+		// if (ret != 0)
+		// {
+		// 	LOG_ERR("MPU6050 accel channel get failed (%d)", ret);
+		// 	k_sleep(K_MSEC(500));
+		// 	continue;
+		// }
 
 		ret = sensor_channel_get(mpu6050_dev, SENSOR_CHAN_GYRO_XYZ, gyro);
-		if (ret != 0)
-		{
-			LOG_ERR("MPU6050 gyro channel get failed (%d)", ret);
-			k_sleep(K_MSEC(500));
-			continue;
-		}
+		// if (ret != 0)
+		// {
+		// 	LOG_ERR("MPU6050 gyro channel get failed (%d)", ret);
+		// 	k_sleep(K_MSEC(500));
+		// 	continue;
+		// }
 
 		LOG_INF("Accel x=%d.%06d y=%d.%06d z=%d.%06d",
 			accel[0].val1, accel[0].val2,

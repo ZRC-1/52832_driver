@@ -10,3 +10,28 @@
 
 // For more help, browse the DeviceTree documentation at https://docs.zephyrproject.org/latest/guides/dts/index.html
 // You can also visit the nRF DeviceTree extension documentation at https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/ncs_configure_app.html#devicetree-support-in-the-extension
+
+&i2c0 {
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+
+	mpu6050: mpu6050@68 {
+		compatible = "invensense,mpu6050";
+		reg = <0x68>;
+		int-gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+		accel-fs = <2>;
+		gyro-fs = <250>;
+		smplrt-div = <0>;
+
+		zephyr,deferred-init;
+	};
+};
+/delete-node/ &{/pin-controller/i2c0_sleep/group1/};
+/delete-node/ &{/pin-controller/i2c0_default/group1/};
+/delete-node/ &{/pin-controller/spi2_default/group1/};
+/delete-node/ &{/pin-controller/spi2_sleep/group1/};
+
+&i2c0_default {
+	group1 {
+		psels = <NRF_PSEL(TWIM_SCL, 0, 22)>, <NRF_PSEL(TWIM_SDA, 0, 23)>;
+	};
+};
