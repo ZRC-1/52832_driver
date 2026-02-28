@@ -5,6 +5,7 @@
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/device.h>
+#include <errno.h>
 #include <strings.h>
 /* 定义日志模块 */
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
@@ -136,8 +137,57 @@ int main(void)
 	struct sensor_value accel[3];
 	struct sensor_value gyro[3];
 	LOG_INF("Hello World! %s\n", CONFIG_BOARD_TARGET);
-	
-	device_init(mpu6050_dev);
+	uint8_t write_buf[3] = {0x75,0x6b,0x00};
+	uint8_t read_buf[1] = { 0x00};
+	ret=i2c_write_dt(&mpu6050_i2c, write_buf, 1);
+	//ret=i2c_write(mpu6050_i2c.bus, write_buf, 1, 0x68);
+	if (ret != 0)
+	{
+		LOG_ERR("Failed to write read (%d)", ret);
+	}
+	ret=i2c_read_dt(&mpu6050_i2c, read_buf, 1);
+	//ret=i2c_read(mpu6050_i2c.bus, read_buf, 1, 0x68);
+	if (ret != 0)
+	{
+		LOG_ERR("Failed to read (%d)", ret);
+	}
+	LOG_INF("read_buf = %02x", read_buf[0]);
+	i2c_write_dt(&mpu6050_i2c, &write_buf[1], 2);
+	k_sleep(K_MSEC(1000));
+	uint8_t write_buf2[1] = {0x3B};
+	uint8_t read_buf2[14] = {0};
+	while (1)
+	{
+		ret = i2c_write_read_dt(&mpu6050_i2c, write_buf2, 1, read_buf2, 14);
+		if (ret != 0)
+		{
+			LOG_ERR("Failed to write_read (%d)", ret);
+		}
+		else
+		{
+			LOG_INF("read_buf2 = %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
+				read_buf2[0], read_buf2[1], read_buf2[2], read_buf2[3], read_buf2[4], read_buf2[5], read_buf2[6], read_buf2[7], read_buf2[8], read_buf2[9], read_buf2[10], read_buf2[11], read_buf2[12], read_buf2[13]);
+		}
+		k_sleep(K_MSEC(1000));
+	}
+	// while (1)
+	// {
+	// 	ret=i2c_write_dt(&mpu6050_i2c, write_buf2, 1);
+	// 	if (ret != 0)
+	// 	{
+	// 		LOG_ERR("Failed to write (%d)", ret);
+	// 	}
+	// 	k_sleep(K_MSEC(1000));
+	// 	ret=i2c_read_dt(&mpu6050_i2c, read_buf2, 14);
+	// 	if (ret != 0)
+	// 	{
+	// 		LOG_ERR("Failed to read (%d)", ret);
+	// 	}
+	// 	LOG_INF("read_buf2 = %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
+	// 		read_buf2[0], read_buf2[1], read_buf2[2], read_buf2[3], read_buf2[4], read_buf2[5], read_buf2[6], read_buf2[7], read_buf2[8], read_buf2[9], read_buf2[10], read_buf2[11], read_buf2[12], read_buf2[13]);
+	// 	k_sleep(K_MSEC(1000));
+	// }
+	//device_init(mpu6050_dev);
 	/* 启动前先扫描 I2C0 总线 */
 	//i2c0_scan();
 	ret = mpu6050_init_chip();
