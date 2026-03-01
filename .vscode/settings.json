@@ -1,0 +1,6 @@
+{
+    "kiroAgent.configureMCP": "Disabled",
+    "nrf-connect.applications": [
+        "${workspaceFolder}"
+    ]
+}
