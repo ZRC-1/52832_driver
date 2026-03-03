@@ -10,7 +10,7 @@
 
 // For more help, browse the DeviceTree documentation at https://docs.zephyrproject.org/latest/guides/dts/index.html
 // You can also visit the nRF DeviceTree extension documentation at https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/ncs_configure_app.html#devicetree-support-in-the-extension
-
+#if 0
 &i2c0 {
 	clock-frequency = <I2C_BITRATE_STANDARD>;
 
@@ -25,11 +25,6 @@
 		zephyr,deferred-init;
 	};
 };
-/delete-node/ &{/pin-controller/i2c0_sleep/group1/};
-/delete-node/ &{/pin-controller/i2c0_default/group1/};
-/delete-node/ &{/pin-controller/spi2_default/group1/};
-/delete-node/ &{/pin-controller/spi2_sleep/group1/};
-
 &i2c0_default {
 	group1 {
 		psels = <NRF_PSEL(TWIM_SCL, 0, 22)>, <NRF_PSEL(TWIM_SDA, 0, 23)>;
@@ -41,4 +36,94 @@
 		low-power-enable;
 	};
 };
+#else
+/delete-node/ &{/pin-controller/i2c0_sleep/group1/};
+/delete-node/ &{/pin-controller/i2c0_default/group1/};
+#endif
 
+&spi2 {
+	status = "okay";
+	cs-gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
+	pinctrl-0 = <&spi2_default>;
+	pinctrl-1 = <&spi2_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+/ {
+	chosen {
+		zephyr,display = &st7735r;
+	};
+
+	mipi_dbi_st7735r {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi2>;
+		dc-gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;   /* 按实际接线修改 */
+		reset-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>; /* 按实际接线修改 */
+		write-only;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		st7735r: st7735r@0 {
+			compatible = "sitronix,st7735r";
+			reg = <0>;
+			status = "okay";
+			mipi-max-frequency = <8000000>;
+			mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+			colmod = <0x55>; /* RGB565 */
+
+			/* Required by binding */
+			width = <128>;
+			height = <160>;
+			x-offset = <0>;
+			y-offset = <0>;
+			gamctrp1 = [0f 1a 0f 18 2f 28 20 22 1f 1b 23 37 00 07 02 10];
+			gamctrn1 = [0f 1b 0f 17 33 2c 29 2e 30 30 39 3f 00 07 03 10];
+
+			/* Explicitly define these to satisfy compile-time DT access */
+			caset = [00 00 00 7f];
+			raset = [00 00 00 9f];
+		};
+	};
+};
+
+&spi2_default {
+	group1 {
+		psels = <NRF_PSEL(SPIM_SCK, 0, 22)>, <NRF_PSEL(SPIM_MOSI, 0, 23)>;
+	};
+};
+
+&spi2_sleep {
+	group1 {
+		psels = <NRF_PSEL(SPIM_SCK, 0, 22)>, <NRF_PSEL(SPIM_MOSI, 0, 23)>;
+		low-power-enable;
+	};
+};
+
+&arduino_adc {
+	io-channel-map = <0 &adc 1>, <1 &adc 2>, <2 &adc 4>, <3 &adc 5>, <4 &adc 6>, <5 &adc 7>;
+};
+
+&arduino_header {
+	gpio-map = <ARDUINO_HEADER_R3_A0 0 &gpio0 3 0>,
+			   <ARDUINO_HEADER_R3_A1 0 &gpio0 4 0>,
+			   <ARDUINO_HEADER_R3_A2 0 &gpio0 28 0>,
+			   <ARDUINO_HEADER_R3_A3 0 &gpio0 29 0>,
+			   <ARDUINO_HEADER_R3_A4 0 &gpio0 30 0>,
+			   <ARDUINO_HEADER_R3_A5 0 &gpio0 31 0>,
+			   <ARDUINO_HEADER_R3_D0 0 &gpio0 11 0>,
+			   <ARDUINO_HEADER_R3_D1 0 &gpio0 12 0>,
+			   <ARDUINO_HEADER_R3_D2 0 &gpio0 13 0>,
+			   <ARDUINO_HEADER_R3_D3 0 &gpio0 14 0>,
+			   <ARDUINO_HEADER_R3_D4 0 &gpio0 15 0>,
+			   <ARDUINO_HEADER_R3_D5 0 &gpio0 16 0>,
+			   <ARDUINO_HEADER_R3_D6 0 &gpio0 17 0>,
+			   <ARDUINO_HEADER_R3_D7 0 &gpio0 18 0>,
+			   <ARDUINO_HEADER_R3_D8 0 &gpio0 19 0>,
+			   <ARDUINO_HEADER_R3_D9 0 &gpio0 20 0>,
+			   <ARDUINO_HEADER_R3_D10 0 &gpio0 22 0>,
+			   <ARDUINO_HEADER_R3_D11 0 &gpio0 23 0>,
+			   <ARDUINO_HEADER_R3_D12 0 &gpio0 24 0>,
+			   <ARDUINO_HEADER_R3_D13 0 &gpio0 25 0>,
+			   <ARDUINO_HEADER_R3_D14 0 &gpio0 26 0>,
+			   <ARDUINO_HEADER_R3_D15 0 &gpio0 27 0>;
+};
